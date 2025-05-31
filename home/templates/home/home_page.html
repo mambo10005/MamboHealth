@@ -1,21 +1,41 @@
 {% extends "base.html" %}
-{% load static %}
 
-{% block body_class %}template-homepage{% endblock %}
+{% load wagtailcore_tags %}
 
-{% block extra_css %}
 
-{% comment %}
-Delete the line below if you're just getting started and want to remove the welcome screen!
-{% endcomment %}
-<link rel="stylesheet" href="{% static 'css/welcome_page.css' %}">
-{% endblock extra_css %}
+{% block title %}{{ page.title }}{% endblock %}
 
 {% block content %}
+<div class="text-center mb-5">
+    <h2>{{ page.hero_title|richtext }}</h2>
+    <p class="lead">{{ page.hero_subtitle|richtext }}</p>
+    <a class="btn btn-primary m-2" href="/track-health/"><i class="bi bi-heart-pulse"></i> Track Health</a>
+    <a class="btn btn-outline-secondary m-2" href="/blog/"><i class="bi bi-journal-text"></i> Read Blog</a>
+</div>
 
-{% comment %}
-Delete the line below if you're just getting started and want to remove the welcome screen!
-{% endcomment %}
-{% include 'home/welcome_page.html' %}
+<div class="row g-4 mb-5">
+    <div class="col-md-4"><div class="card p-3"><i class="bi bi-heart-pulse fs-2"></i> Health Records</div></div>
+    <div class="col-md-4"><div class="card p-3"><i class="bi bi-cup-straw fs-2"></i> Nutrition</div></div>
+    <div class="col-md-4"><div class="card p-3"><i class="bi bi-bicycle fs-2"></i> Exercise</div></div>
+    <div class="col-md-4"><div class="card p-3"><i class="bi bi-moon-stars fs-2"></i> Sleep</div></div>
+    <div class="col-md-4"><div class="card p-3"><i class="bi bi-emoji-smile fs-2"></i> Mental Health</div></div>
+</div>
 
-{% endblock content %}
+<h3 class="mb-3">Latest Blog Posts</h3>
+<div class="row">
+    {% for post in blog_posts %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ post.title }}</h5>
+                    <p class="card-text">{{ post.intro|truncatewords:20 }}</p>
+                    <a href="{{ post.url }}" class="btn btn-sm btn-outline-primary">Read More</a>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <p>No blog posts found.</p>
+    {% endfor %}
+</div>
+
+{% endblock %}
