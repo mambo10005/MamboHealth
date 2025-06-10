@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load health_tags %}
+
+{% block content %}
+<div class="container my-4">
+  <h2 class="mb-4">🩺 건강 기록 상세</h2>
+
+  <a href="{% url 'health_data:health_record_update' record.pk %}" class="btn btn-primary mb-3">
+    <i class="bi bi-pencil-square"></i> 기록 수정
+  </a>
+
+  <div class="accordion" id="healthRecordAccordion">
+    {% for category, fields in field_groups.items %}
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}">
+            {{ category }}
+          </button>
+        </h2>
+        <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" data-bs-parent="#accordionExample">
+          <div class="accordion-body">
+            <ul class="list-group list-group-flush">
+              {% for field in fields %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <span><strong>{{ field_labels|get_item:field|default:field }}</strong></span>
+                  <span>{{ record|get_attr:field }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+
+  </div>
+</div>
+{% endblock %}
+
+

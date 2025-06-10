@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">건강 기록 입력</h2>
+
+    {% if has_last %}
+        <a href="?copy_last=1" class="btn btn-outline-info mb-3">
+            <i class="bi bi-arrow-clockwise"></i> 지난 기록 불러오기
+        </a>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- 기본 정보 -->
+        <div class="mb-4">
+            <h5>📅 기본 정보</h5>
+            <div class="row">
+                {% for field in form %}
+                    {% if field.name in basic_info_fields %}
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">{{ field.label }}</label>
+                            {{ field|add_class:"form-control" }}
+                            {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+
+        <!-- Accordion 시작 -->
+        <div class="accordion mb-4" id="healthAccordion">
+            {% for section in accordion_sections %}
+                {% include "health_data/partials/accordion_section.html" with title=section.title section_id=section.id color=section.color fields=section.fields %}
+            {% endfor %}
+        </div>
+
+        <!-- 저장 버튼 -->
+        <div class="d-flex justify-content-between">
+            <a href="{% url 'health_data:health_record_list' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left-circle"></i> 돌아가기
+            </a>
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-save-fill"></i> 저장하기
+            </button>
+        </div>
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}

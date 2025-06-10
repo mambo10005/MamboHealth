@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Your Health Records</h2>
+<a href="{% url 'add_health_record' %}">Add New Record</a>
+<ul>
+  {% for record in records %}
+    <li>{{ record.date_measured }} - BP: {{ record.systolic_bp }}/{{ record.diastolic_bp }}, Glucose: {{ record.glucose }}</li>
+  {% empty %}
+    <li>No records yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}
