@@ -6,15 +6,41 @@
 <div class="container mt-4">
     <h2 class="mb-4">건강 기록 입력</h2>
 
+    <!-- ✅ Message block added here -->
+    {% if messages %}
+      <div class="mb-3">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
     {% if has_last %}
         <a href="?copy_last=1" class="btn btn-outline-info mb-3">
             <i class="bi bi-arrow-clockwise"></i> 지난 기록 불러오기
         </a>
     {% endif %}
 
-    <form method="post" novalidate>
+    <!-- PDF 업로드 버튼 -->
+    <form method="post" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
-
+    
+        <!-- PDF 업로드 버튼 -->
+        <div class="row g-3 align-items-center mb-4">
+            <div class="col-auto">
+                <label for="pdf_file" class="form-label mb-0">PDF에서 불러오기</label>
+                <input type="file" name="pdf_file" id="pdf_file" accept="application/pdf" class="form-control">
+            </div>
+            <div class="col-auto">
+                <button type="submit" name="load_pdf" value="1" class="btn btn-outline-primary">
+                    <i class="bi bi-upload"></i> PDF 불러오기
+                </button>
+            </div>
+        </div>
+    
         <!-- 기본 정보 -->
         <div class="mb-4">
             <h5>📅 기본 정보</h5>
@@ -32,15 +58,14 @@
                 {% endfor %}
             </div>
         </div>
-
-
+    
         <!-- Accordion 시작 -->
         <div class="accordion mb-4" id="healthAccordion">
             {% for section in accordion_sections %}
                 {% include "health_data/partials/accordion_section.html" with title=section.title section_id=section.id color=section.color fields=section.fields %}
             {% endfor %}
         </div>
-
+    
         <!-- 저장 버튼 -->
         <div class="d-flex justify-content-between">
             <a href="{% url 'health_data:health_record_list' %}" class="btn btn-secondary">
@@ -50,11 +75,11 @@
                 <i class="bi bi-save-fill"></i> 저장하기
             </button>
         </div>
-
+    
         {% if form.non_field_errors %}
-          <div class="alert alert-danger">
-            {{ form.non_field_errors }}
-          </div>
+            <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+            </div>
         {% endif %}
     </form>
 </div>

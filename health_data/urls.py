@@ -12,3 +12,7 @@ urlpatterns = [
     path('<int:pk>/edit/', views.health_record_update, name='health_record_update'),
     path('record/<int:pk>/delete/', HealthRecordDeleteView.as_view(), name='health_record_delete'),
 ]
+
+urlpatterns += [
+    path('upload-pdf/', views.upload_health_pdf, name='upload_health_pdf'),
+]

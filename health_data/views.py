@@ -11,6 +11,12 @@ from django.urls import reverse_lazy
 
 from django.forms.models import model_to_dict
 
+#import io
+from django.contrib import messages
+from .parsers import parse_hospital_a, parse_hospital_b
+from .parsers import parse_pdf_to_health_data
+from PyPDF2 import PdfReader
+
 @login_required
 def health_record_list(request):
     records = HealthRecord.objects.all().order_by('-date_measured')
@@ -216,16 +222,21 @@ def health_record_create(request):
     last_record = HealthRecord.objects.filter(user=request.user).order_by('-date_measured').first()
 
     if request.method == 'POST':
-        form = HealthRecordForm(request.POST)
-        if form.is_valid():
-            health_record = form.save(commit=False)
-            health_record.user = request.user
-            health_record.date_recorded = datetime.now()
-            health_record.save()
-            form.save_m2m()
-            return redirect('health_data:health_record_list')
+        if 'load_pdf' in request.POST and request.FILES.get('pdf_file'):
+            uploaded_pdf = request.FILES['pdf_file']
+            parsed_data = parse_pdf_to_health_data(uploaded_pdf)
+            form = HealthRecordForm(initial=parsed_data)
         else:
-            print("Form is invalid:", form.errors)
+            form = HealthRecordForm(request.POST)
+            if form.is_valid():
+                health_record = form.save(commit=False)
+                health_record.user = request.user
+                health_record.date_recorded = datetime.now()
+                health_record.save()
+                return redirect('health_data:health_record_list')
+
+            else:
+                print("Form is invalid:", form.errors)
 
     elif request.GET.get("copy_last") and last_record:
         record_data = model_to_dict(last_record)
@@ -306,10 +317,19 @@ def health_record_create(request):
 def health_record_update(request, pk):
     record = get_object_or_404(HealthRecord, pk=pk, user=request.user)
     if request.method == 'POST':
-        form = HealthRecordForm(request.POST, instance=record)
-        if form.is_valid():
-            form.save()
-            return redirect('health_data:health_record_detail', pk=pk)
+        if 'load_pdf' in request.POST and request.FILES.get('pdf_file'):
+            uploaded_pdf = request.FILES['pdf_file']
+            parsed_data = parse_pdf_to_health_data(uploaded_pdf)
+            form = HealthRecordForm(initial=parsed_data)
+        else:
+            form = HealthRecordForm(request.POST)
+            if form.is_valid():
+                health_record = form.save(commit=False)
+                health_record.user = request.user
+                health_record.date_recorded = datetime.now()
+                health_record.save()
+                return redirect('health_data:health_record_list')
+
     else:
         form = HealthRecordForm(instance=record)
 
@@ -387,3 +407,30 @@ class HealthRecordDeleteView(DeleteView):
     def get_queryset(self):
         # Ensure only the user's own records can be deleted
         return HealthRecord.objects.filter(user=self.request.user)
+
+@login_required
+def upload_health_pdf(request):
+    if request.method == "POST" and request.FILES.get("pdf_file"):
+        pdf_file = request.FILES["pdf_file"]
+        reader = PdfReader(pdf_file)
+        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+
+        # Attempt both parsers
+        parsed_data = parse_hospital_a(text)
+        if not parsed_data or len(parsed_data) < 3:
+            parsed_data = parse_hospital_b(text)
+
+        if parsed_data:
+            try:
+                if 'date_measured' in parsed_data:
+                    parsed_data['date_measured'] = datetime.strptime(parsed_data['date_measured'], '%Y-%m-%d').date()
+                record = HealthRecord(user=request.user, **parsed_data)
+                record.date_recorded = datetime.now()
+                record.save()
+                messages.success(request, "PDF에서 건강 정보가 성공적으로 등록되었습니다.")
+            except Exception as e:
+                messages.error(request, f"저장 중 오류 발생: {e}")
+        else:
+            messages.error(request, "PDF에서 데이터를 추출할 수 없습니다.")
+
+    return redirect('health_data:health_record_list')
