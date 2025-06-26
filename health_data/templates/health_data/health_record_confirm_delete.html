@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>건강 지표 삭제 - Delete Health Record</h2>
+  <p>정말로 <strong>{{ object.date_measured }}</strong>의 기록을 삭제하시겠습니까?</p>
+
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">삭제</button>
+    <a href="{% url 'health_data:health_record_list' %}" class="btn btn-secondary">취소</a>
+  </form>
+{% endblock %}

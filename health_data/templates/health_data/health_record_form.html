@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4"><i class="bi bi-clipboard2-pulse-fill me-2"></i>건강 기록 입력</h2>
+
+    <!-- ✅ Flash Messages -->
+    {% if messages %}
+    <div class="mb-3">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            <i class="bi bi-info-circle-fill me-2"></i>{{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 🔁 Copy Last Button -->
+    {% if has_last %}
+    <div class="mb-3">
+        <form method="post" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" name="copy_last" value="1" class="btn btn-outline-info">
+                <i class="bi bi-arrow-clockwise"></i> 지난 기록 불러오기
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- 🧾 Health Record Form -->
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+
+        <!-- 📂 JSON Upload Section -->
+        <div class="card p-3 mb-4 shadow-sm border-primary">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-5">
+                    <label for="json_file" class="form-label fw-bold">
+                        <i class="bi bi-filetype-json me-2"></i>JSON 파일 선택
+                    </label>
+                    <input type="file" name="json_file" id="json_file" accept="application/json" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" id="loadJsonBtn" name="load_json" value="1" class="btn btn-outline-primary w-100" disabled>
+                        <i class="bi bi-upload me-1"></i> JSON 불러오기
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🧬 Accordion -->
+        <div class="accordion mb-4" id="healthAccordion">
+            {% for section in accordion_sections %}
+                {% include "health_data/partials/accordion_section.html" with title=section.title section_id=section.id color=section.color fields=section.fields %}
+            {% endfor %}
+        </div>
+
+        <!-- ✅ Save Buttons -->
+        <div class="d-flex justify-content-between mt-4">
+            <a href="{% url 'health_data:health_record_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left-circle"></i> 돌아가기
+            </a>
+            <button type="submit" name="submit" class="btn btn-success">
+                <i class="bi bi-save2-fill"></i> 저장하기
+            </button>
+        </div>
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger mt-3">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const fileInput = document.getElementById('json_file');
+    const submitBtn = document.getElementById('loadJsonBtn');
+
+    fileInput.addEventListener('change', function () {
+      submitBtn.disabled = !fileInput.files.length;
+    });
+  });
+</script>
+{% endblock %}

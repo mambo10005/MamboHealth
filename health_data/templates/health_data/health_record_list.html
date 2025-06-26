@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% load static %}
+{% load health_tags %}
+{% block content %}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+<div class="container my-4">
+  <h2 class="mb-3"><i class="bi bi-heart-pulse-fill text-danger"></i> 내 건강 지표 - My Health Records</h2>
+
+  <div class="d-flex flex-wrap justify-content-between align-items-end mb-4 gap-2">
+    <div>
+      <a class="btn btn-primary" href="{% url 'health_data:health_record_create' %}">
+        <i class="bi bi-plus-circle"></i> 새 지표 입력
+      </a>
+    </div>
+
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-end">
+      <div class="d-flex align-items-center gap-2">
+        <label for="year" class="form-label mb-0">연도</label>
+        <select name="year" id="year" class="form-select">
+          <option value="">전체</option>
+          {% for y in years %}
+            <option value="{{ y }}" {% if selected_year == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <label for="month" class="form-label mb-0">월</label>
+        <select name="month" id="month" class="form-select">
+          <option value="">전체</option>
+          {% for m in months %}
+            <option value="{{ m }}" {% if selected_month == m|stringformat:"s" %}selected{% endif %}>{{ m }}월</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-secondary"><i class="bi bi-filter"></i> 필터</button>
+        <a href="{% url 'health_data:health_record_list' %}" class="btn btn-outline-secondary">초기화</a>
+      </div>
+    </form>
+  </div>
+
+  <h4 class="mb-3"><i class="bi bi-table me-2"></i> 건강 지표 데이터 - Health Indicator Data</h4>
+  <!-- Table Column Selector -->
+  <div class="accordion mb-4" id="tableSelectorAccordion">
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingColumns">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2">
+          <div>
+            <button class="accordion-button collapsed p-0 bg-transparent border-0 shadow-none" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#collapseColumns"
+                    aria-expanded="false" aria-controls="collapseColumns">
+               표시할 컬럼 선택 (Table Columns)
+            </button>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm" onclick="savePreferences()" data-bs-toggle="tooltip" title="선택한 항목을 저장합니다">
+              <i class="bi bi-save"></i> Save Preferences
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="resetPreferences('table')">
+              <i class="bi bi-arrow-counterclockwise"></i> Reset to Default
+            </button>
+
+          </div>
+        </div>
+      </h2>
+
+      <div id="collapseColumns" class="accordion-collapse collapse" data-bs-parent="#tableSelectorAccordion">
+        <div class="accordion-body" id="columnSelector" style="max-height: 300px; overflow-y: auto;">
+          {% for group_name, fields in field_groups.items %}
+            {% if group_name != "기타" %} <!-- Optionally skip '기타' -->
+              <div class="mb-3 border rounded p-2">
+                <div class="d-flex justify-content-between align-items-center">
+                  <button class="btn btn-link text-start p-0" type="button" data-bs-toggle="collapse" data-bs-target="#group-{{ forloop.counter }}" aria-expanded="false" aria-controls="group-{{ forloop.counter }}">
+                    <strong>{{ group_name }}</strong>
+                  </button>
+                  <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-primary" onclick="toggleGroup('{{ group_name }}', true)">전체 선택</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="toggleGroup('{{ group_name }}', false)">전체 해제</button>
+                  </div>
+                </div>
+                <div id="group-{{ forloop.counter }}" class="collapse ms-3 mt-2 group-checkboxes" data-group="{{ group_name }}">
+                  {% for f in fields %}
+                    {% if f in field_labels %}
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="{{ f }}" id="column_{{ f }}" name="tableColumnSelector"
+                          {% if f in table_fields %}checked{% endif %}>
+                        <label class="form-check-label" for="column_{{ f }}">{{ field_labels|get_item:f }}</label>
+                      </div>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Health Table -->
+  <div class="table-responsive">
+    <div class="row mb-2">
+      <div class="col-12 d-flex justify-content-end flex-wrap gap-2">
+        <button class="btn btn-outline-success btn-sm" onclick="exportVisibleTableToExcel()" data-bs-toggle="tooltip" title="표시된 컬럼만 Excel로 저장합니다">
+          <i class="bi bi-file-earmark-spreadsheet"></i> 테이블 데이터 엑셀 다운로드 (Export Table to Excel)
+        </button>
+        <button class="btn btn-outline-primary btn-sm" onclick="exportTableToExcel()" data-bs-toggle="tooltip" title="모든 데이터를 Excel 파일로 저장합니다">
+          <i class="bi bi-file-earmark-excel"></i> 모든 데이터 엑셀 다운로드 (Export All Data to Excel)
+        </button>
+      </div>
+    </div>
+
+    
+    <table id="healthTable" class="table-responsive table-bordered table-hover text-center">
+      <thead class="table-light">
+        <tr>
+          <th>측정일</th>
+          {% for f in field_labels.keys %}
+            <th data-col="{{ f }}">{{ field_labels|get_item:f }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+          <tr>
+            <td>
+              <a href="{% url 'health_data:health_record_detail' record.pk %}">
+                {{ record.date_measured|date:"Y-m-d" }}
+              </a>
+            </td>
+            {% for f in field_labels.keys %}
+              {% with value=record|get_attr:f range=field_ranges|get_item:f %}
+                {% if value and range %}
+                  {% if value < range.0 or value > range.1 %}
+                    <td data-col="{{ f }}" class="text-danger fw-bold" title="정상범위: {{ range.0 }}–{{ range.1 }}">{{ value }}</td>
+                  {% else %}
+                    <td data-col="{{ f }}">{{ value }}</td>
+                  {% endif %}
+                {% else %}
+                  <td data-col="{{ f }}">{{ value }}</td>
+                {% endif %}
+              {% endwith %}
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+  <hr class="my-5">
+  <h4 class="mb-3"><i class="bi bi-graph-up"></i> 건강 지표 차트 - Health Indicator Chart</h4>
+
+
+  <!-- Chart Column Selector -->
+  <div class="accordion mb-4" id="chartSelectorAccordion">
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingChart">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2">
+          <div>
+            <button class="accordion-button collapsed p-0 bg-transparent border-0 shadow-none" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#collapseChart"
+                    aria-expanded="false" aria-controls="collapseChart">
+              차트 지표 선택 (Chart Indicators)
+            </button>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm" onclick="savePreferences()" data-bs-toggle="tooltip" title="선택한 항목을 저장합니다">
+              <i class="bi bi-save"></i> Save Preferences
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="resetPreferences('chart')">
+              <i class="bi bi-arrow-counterclockwise"></i> Reset to Default
+            </button>
+
+          </div>
+        </div>
+      </h2>
+
+      <div id="collapseChart" class="accordion-collapse collapse" data-bs-parent="#chartSelectorAccordion">
+        <div class="accordion-body" id="chartSelector" style="max-height: 300px; overflow-y: auto;">
+          {% for group_name, fields in field_groups.items %}
+            {% if group_name != "기타" %} <!-- Optionally skip '기타' -->
+              <div class="mb-3 border rounded p-2">
+                <div class="d-flex justify-content-between align-items-center">
+                  <button class="btn btn-link text-start p-0" type="button" data-bs-toggle="collapse" data-bs-target="#group-{{ forloop.counter }}" aria-expanded="false" aria-controls="group-{{ forloop.counter }}">
+                    <strong>{{ group_name }}</strong>
+                  </button>
+                  <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-primary" onclick="toggleGroup('{{ group_name }}', true)">전체 선택</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="toggleGroup('{{ group_name }}', false)">전체 해제</button>
+                  </div>
+                </div>
+                <div id="group-{{ forloop.counter }}" class="collapse ms-3 mt-2 group-checkboxes" data-group="{{ group_name }}">
+                  {% for f in fields %}
+                    {% if f in field_labels %}
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="{{ f }}" id="chart_{{ f }}" name="chartColumnSelector"
+                          {% if f in chart_fields %}checked{% endif %}
+                          data-bs-toggle="tooltip" title="차트에 {{ field_labels|get_item:f }} 항목을 포함합니다">
+                        <label class="form-check-label" for="chart_{{ f }}">{{ field_labels|get_item:f }}</label>
+                      </div>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Chart -->
+  <div class="d-flex justify-content-end mb-2">
+    <button class="btn btn-outline-danger btn-sm" onclick="downloadChartAsPDF()">
+      <i class="bi bi-file-earmark-pdf"></i> Export Chart to PDF
+    </button>
+  </div>
+  <div class="card mt-5">
+    <div class="card-body" style="overflow-x: auto;">
+      <div class="position-relative" style="min-height: 300px;">
+        <canvas id="healthChart" style="max-height: 400px; width: 100%;"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- JavaScript -->
+  <script>
+    const fieldLabels = {{ field_labels_json|safe }};
+    const records = {{ records_json|safe }};
+    let chart;
+
+    function getCheckedCheckboxes(containerId) {
+      return Array.from(document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`)).map(cb => cb.value);
+    }
+
+    function toggleGroup(groupName, check = true) {
+      const tableCheckboxes = document.querySelectorAll(`.group-checkboxes[data-group="${groupName}"] input[name="tableColumnSelector"]`);
+      const chartCheckboxes = document.querySelectorAll(`.group-checkboxes[data-group="${groupName}"] input[name="chartColumnSelector"]`);
+
+      tableCheckboxes.forEach(cb => cb.checked = check);
+      chartCheckboxes.forEach(cb => cb.checked = check);
+
+      updateTableColumns();
+      updateChart();
+    }
+
+
+    function getSelectedChartFields() {
+      return Array.from(document.querySelectorAll('#chartSelector input[type="checkbox"]:checked')).map(cb => cb.value);
+    }
+
+
+    function updateTableColumns() {
+      const selected = getCheckedCheckboxes('columnSelector');
+
+      document.querySelectorAll('#healthTable thead th, #healthTable tbody td').forEach(el => {
+        const col = el.getAttribute('data-col');
+        if (col) {
+          el.style.display = selected.includes(col) ? '' : 'none';
+        }
+      });
+    }
+    function getRandomColor(index) {
+      const colors = [
+        'rgba(75,192,192,1)', 'rgba(255,99,132,1)', 'rgba(54,162,235,1)',
+        'rgba(255,206,86,1)', 'rgba(153,102,255,1)', 'rgba(255,159,64,1)',
+        'rgba(201,203,207,1)', 'rgba(0,128,128,1)', 'rgba(0,0,255,1)'
+      ];
+      return colors[index % colors.length];
+    }
+
+    function updateChart() {
+      const selected = getCheckedCheckboxes('chartSelector');
+
+      // Sort records by date ascending (oldest to newest)
+      const sortedRecords = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      const datasets = selected.map((key, index) => ({
+        label: fieldLabels[key],
+        data: sortedRecords.map(r => r[key]),
+        borderColor: getRandomColor(index),
+        fill: false,
+        tension: 0.3
+      }));
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(document.getElementById('healthChart'), {
+        type: 'line',
+        data: {
+          labels: sortedRecords.map(r => r.date),
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: window.innerWidth < 576 ? 'bottom' : 'top',  // Responsive legend position
+            }
+          },
+          layout: {
+            padding: 10
+          }
+        }
+      });
+    }
+
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast align-items-center text-white bg-${type} border-0 position-fixed top-0 end-0 m-4`;
+      toast.style.zIndex = 1055;
+      toast.setAttribute('role', 'alert');
+      toast.setAttribute('aria-live', 'assertive');
+      toast.setAttribute('aria-atomic', 'true');
+
+      toast.innerHTML = `
+        <div class="d-flex">
+          <div class="toast-body">${message}</div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+      `;
+      document.body.appendChild(toast);
+
+      const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+      bsToast.show();
+
+      toast.addEventListener('hidden.bs.toast', () => toast.remove());
+    }
+
+    function exportTableToExcel() {
+      const table = document.getElementById('healthTable');
+      const workbook = XLSX.utils.table_to_book(table, { sheet: "Health Records" });
+      const excelFileName = 'health_records.xlsx';
+
+      XLSX.writeFile(workbook, excelFileName);
+    }
+
+    function exportVisibleTableToExcel() {
+      const table = document.getElementById('healthTable');
+
+      // Clone the table so we don't modify the actual DOM
+      const clone = table.cloneNode(true);
+
+      // Remove hidden columns
+      clone.querySelectorAll('th, td').forEach(el => {
+        const col = el.getAttribute('data-col');
+        if (col && el.style.display === 'none') {
+          el.remove();
+        }
+      });
+
+      const workbook = XLSX.utils.table_to_book(clone, { sheet: "Visible Health Records" });
+      const excelFileName = 'visible_health_records.xlsx';
+
+      XLSX.writeFile(workbook, excelFileName);
+    }
+
+
+    async function downloadChartAsPDF() {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+
+      const canvas = document.getElementById('healthChart');
+      const imgData = canvas.toDataURL('image/png');
+
+      const width = 190;
+      const height = canvas.height * (190 / canvas.width);
+
+      pdf.addImage(imgData, 'PNG', 10, 10, width, height);
+      pdf.save('health_chart.pdf');
+    }
+
+    function savePreferences() {
+      const selectedTableFields = getCheckedCheckboxes('columnSelector');
+      const selectedChartFields = getSelectedChartFields();
+
+      fetch("{% url 'health_data:health_record_list' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+          table_fields: selectedTableFields,
+          chart_fields: selectedChartFields,
+        })
+      }).then(res => res.json()).then(data => {
+        if (data.status === "ok") {
+          showToast("Preferences saved successfully.", "success");
+        } else {
+          showToast("Failed to save preferences.", "danger");
+        }
+      }).catch(() => {
+        showToast("An error occurred while saving.", "danger");
+      });
+    }
+
+    function resetPreferences(scope) {
+      const payload = {};
+      if (scope === 'table') {
+        payload.table_fields = [];
+        payload.chart_fields = getCheckedCheckboxes('chartSelector');  // keep current chart
+      } else if (scope === 'chart') {
+        payload.chart_fields = [];
+        payload.table_fields = getCheckedCheckboxes('columnSelector'); // keep current table
+      }
+
+      fetch("{% url 'health_data:health_record_list' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(payload)
+      }).then(res => res.json()).then(data => {
+        if (data.status === "ok") {
+          showToast("Preferences reset to default.", "info");
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          showToast("Failed to reset preferences.", "danger");
+        }
+      }).catch(() => {
+        showToast("An error occurred during reset.", "danger");
+      });
+    }
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+      tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl)
+      });
+      document.querySelectorAll('#chartSelector input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', updateChart);
+      });
+      updateTableColumns();
+      updateChart();
+
+      // Live updates on checkbox change
+      document.getElementById('columnSelector').addEventListener('change', updateTableColumns);
+      document.getElementById('chartSelector').addEventListener('change', updateChart);
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+</div>
+
+{% endblock %}

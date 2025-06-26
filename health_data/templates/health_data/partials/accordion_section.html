@@ -1,0 +1,33 @@
+{% load widget_tweaks %}
+
+<div class="accordion-item border-0 mb-2 shadow-sm rounded" style="background-color: {{ color|default:'#f8f9fa' }};">
+    <h2 class="accordion-header" id="heading_{{ section_id }}">
+        <button class="accordion-button {% if not open %}collapsed{% endif %}" type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapse_{{ section_id }}"
+                aria-expanded="{% if open %}true{% else %}false{% endif %}"
+                aria-controls="collapse_{{ section_id }}">
+            {{ title }}
+        </button>
+    </h2>
+    <div id="collapse_{{ section_id }}"
+         class="accordion-collapse collapse {% if open %}show{% endif %}"
+         aria-labelledby="heading_{{ section_id }}"
+         data-bs-parent="#healthAccordion">
+        <div class="accordion-body">
+            <div class="row">
+                {% for field in form %}
+                    {% if field.name in fields %}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ field.label }}</label>
+                            {{ field|add_class:"form-control" }}
+                            {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
